@@ -1,0 +1,91 @@
+# Flutter/Dart/Pub
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+
+# Build outputs
+build/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Android
+android/.gradle/
+android/app/build/
+*.keystore
+
+# Xcode
+DerivedData/
+*.xcworkspace
+*.xcuserstate
+*.xcsettings
+*.moved-aside
+*.xcuserdatad
+*.orig
+*.lock
+
+# VS Code
+.vscode/
+# (You can keep settings.json if needed)
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# Generated files
+pubspec.lock
+flutter_export_environment.sh
+
+# Crashlytics / Firebase
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+
+# Sensitive Keys
+*.env
+.env*
+
+# Asset-Heavy folders (optional)
+assets_large/
+datasets/
+DATA-SET/
+
+# Custom
+temp/
+
+
+# Ignore dataset
+DATA-SET/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Trained models
+models/
+*.pt
+*.pth
+*.h5
+*.onnx
+
+# Logs
+logs/
+runs/
+outputs/
+
+# Virtual environment
+venv/
+env/
+
+
+CODE/Model-Training/*.h5
+CODE/Model-Training/*.tflite
