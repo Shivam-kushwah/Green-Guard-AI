@@ -9,6 +9,7 @@ import 'package:frontend/model/detection_result.dart';
 import 'package:frontend/model/diagnosis_history_model.dart';
 import 'package:frontend/services/history_service.dart';
 import 'package:frontend/services/tf_service.dart';
+import 'package:frontend/services/scan_reporting_service.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'detection_result_screen.dart';
@@ -67,22 +68,11 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
         file,
       );
 
-      /// Save to Hive history
-      await HistoryService.saveHistory(
-        history: DiagnosisHistory(
-          epochTime: DateTime.now().millisecondsSinceEpoch,
+      /// Persist locally and, when a location and login are available,
+      /// to the district outbreak map. Does not block on the network.
+      final report = await ScanReportingService.instance.report(res);
 
-          plantName: res.species,
-
-          imagePath: res.imagePath,
-
-          result: res.severity,
-
-          diagnosis: res.disease,
-
-          confidence: res.confidence,
-        ),
-      );
+      if (!mounted) return;
 
       setState(() {
         isLoading = false;
@@ -91,7 +81,9 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
       /// Navigate to result screen
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => DetectionDetailPage(result: res)),
+        MaterialPageRoute(
+          builder: (_) => DetectionDetailPage(result: res, report: report),
+        ),
       );
     } catch (e) {
       setState(() {
@@ -115,21 +107,9 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
 
     final DetectionResult res = await TfService.instance.predictFromFile(file);
 
-    await HistoryService.saveHistory(
-      history: DiagnosisHistory(
-        epochTime: DateTime.now().millisecondsSinceEpoch,
+    final report = await ScanReportingService.instance.report(res);
 
-        plantName: res.species,
-
-        imagePath: res.imagePath,
-
-        result: res.severity,
-
-        diagnosis: res.disease,
-
-        confidence: res.confidence,
-      ),
-    );
+    if (!mounted) return;
 
     setState(() {
       isLoading = false;
@@ -137,7 +117,9 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => DetectionDetailPage(result: res)),
+      MaterialPageRoute(
+        builder: (_) => DetectionDetailPage(result: res, report: report),
+      ),
     );
   }
 

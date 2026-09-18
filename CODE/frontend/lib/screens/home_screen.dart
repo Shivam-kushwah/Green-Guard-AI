@@ -7,6 +7,7 @@ import 'package:frontend/screens/scan_camera_screen.dart';
 import 'package:frontend/services/history_service.dart';
 
 import '../utils/colors.dart';
+import '../widgets/weather_risk_banner.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -49,7 +50,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     children: [
                       _HeroBanner(),
+                      const SizedBox(height: 16),
+
+                      /// Weather-driven outbreak risk for this farm.
+                      /// Renders nothing when there is no location fix or no
+                      /// elevated risk, so it never pushes the scan button
+                      /// down for no reason.
+                      const WeatherRiskBanner(),
                       const SizedBox(height: 20),
+
                       _ScanSection(),
                       const SizedBox(height: 28),
                       _RecentDiagnosesSection(history: history),

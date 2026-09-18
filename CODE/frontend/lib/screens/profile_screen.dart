@@ -1,4 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import '../services/hotspot_service.dart';
+import '../widgets/model_status_card.dart';
 import 'package:frontend/screens/login_screen.dart';
 import 'package:hive/hive.dart';
 
@@ -99,6 +103,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 12),
 
               /// Settings Cards
+              /// Learning loop status - which model is running, and whether
+              /// a retrained one is available.
+              const ModelStatusCard(),
+
               _buildTile(
                 icon: Icons.notifications_none,
                 title: "Notifications",
@@ -117,6 +125,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: "Privacy Policy",
                 onTap: () {},
               ),
+
+              /// Demo tooling. Compiled out of release builds entirely, so
+              /// there is no path for seeded data to reach a real deployment
+              /// through the UI.
+              if (kDebugMode) ...[
+                _buildTile(
+                  icon: Icons.auto_awesome_outlined,
+                  title: "Seed demo outbreak data",
+                  subtitle: "Fills the map for a demo - marked as demo data",
+                  onTap: _seedDemo,
+                ),
+                _buildTile(
+                  icon: Icons.delete_sweep_outlined,
+                  title: "Clear demo data",
+                  subtitle: "Removes every seeded district row",
+                  onTap: _clearDemo,
+                ),
+              ],
 
               const Spacer(),
 
@@ -166,6 +192,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _seedDemo() async {
+    _toast('Seeding demo data...');
+    try {
+      await HotspotService.instance.seedDemoData();
+      _toast('Demo outbreak data added to the map');
+    } catch (e) {
+      _toast('Seeding failed: $e');
+    }
+  }
+
+  Future<void> _clearDemo() async {
+    _toast('Clearing demo data...');
+    try {
+      await HotspotService.instance.clearDemoData();
+      _toast('Demo data removed');
+    } catch (e) {
+      _toast('Clear failed: $e');
+    }
+  }
+
+  void _toast(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
     );
   }
 

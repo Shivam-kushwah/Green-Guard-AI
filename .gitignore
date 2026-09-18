@@ -91,3 +91,18 @@ CODE/Model-Training/*.h5
 CODE/Model-Training/*.tflite
 DATA-SET.rar
 *.rar
+# --- Green Guard: cloud + learning loop ---
+
+# Firebase Admin SDK credentials. This is a full-access key to the project -
+# it must never be committed.
+**/serviceAccountKey*.json
+**/firebase-adminsdk*.json
+
+# Exported expert feedback: contains farmer field photos.
+DATA-SET/Feedback/
+CODE/Model-Training/_retrain_work/
+CODE/Model-Training/candidate_rejected.h5
+CODE/Model-Training/release.json
+
+# Flutter web build output
+CODE/frontend/build/

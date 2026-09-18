@@ -1,0 +1,160 @@
+rules_version = '2';
+
+// Green Guard AI - Firestore security rules
+//
+// Deploy with:  firebase deploy --only firestore:rules
+//
+// Design note on the free (Spark) plan:
+// Without Cloud Functions there is no trusted server process, so aggregates in
+// district_stats are maintained by clients. These rules therefore have to let
+// any signed-in user increment those counters. That is the one genuinely soft
+// spot in this model and it is deliberate, not an oversight - a malicious user
+// could inflate a district's case count. Moving _bumpDistrictStat into a
+// Function triggered by the scan write closes it, and is the first thing to do
+// on upgrading to Blaze.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------ helpers
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() && userDoc().role == role;
+    }
+
+    // A role claim alone is not enough to act on other farmers' cases - an
+    // admin must also have set verified. Checked here as well as in the UI,
+    // because client-side checks are a convenience, not a control.
+    function isVerifiedAgronomist() {
+      return hasRole('agronomist') && userDoc().verified == true;
+    }
+
+    function isOfficer() {
+      return hasRole('officer') || hasRole('admin');
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    // Fields a user must never be able to set on themselves. Without this any
+    // farmer could self-promote to agronomist and start ruling on cases.
+    function notEscalatingPrivilege() {
+      return !request.resource.data.diff(resource.data)
+               .affectedKeys()
+               .hasAny(['role', 'verified', 'reviewsCompleted']);
+    }
+
+    // -------------------------------------------------------------- users
+
+    match /users/{uid} {
+      // Any signed-in user can read a profile: farmers need to see which
+      // agronomist answered them, and the dashboard lists reviewers.
+      allow read: if isSignedIn();
+
+      allow create: if isSelf(uid)
+                    && request.resource.data.role == 'farmer'
+                    && request.resource.data.verified == false;
+
+      allow update: if (isSelf(uid) && notEscalatingPrivilege())
+                    || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // -------------------------------------------------------------- scans
+
+    match /scans/{scanId} {
+      // Readable by the owner, by reviewers, and by officers. Note that a
+      // scan document carries only coarsened coordinates - precise farm
+      // location never leaves the device - so a broad read here does not
+      // expose a farm's position.
+      allow read: if isSignedIn();
+
+      allow create: if isSelf(request.resource.data.uid)
+                    && request.resource.data.reviewStatus in ['none', 'pending'];
+
+      // The farmer owns their scan but must not be able to forge a verdict,
+      // so the expert fields are off-limits to them.
+      allow update: if isSelf(resource.data.uid)
+                    && !request.resource.data.diff(resource.data)
+                          .affectedKeys()
+                          .hasAny(['expertUid', 'expertName', 'expertDisease',
+                                   'expertSpecies', 'expertNote', 'reviewedAt',
+                                   'expertQualification']);
+
+      // A verified agronomist may rule on a case, but may not rewrite what
+      // the model originally said - that would destroy the learning loop's
+      // ground truth.
+      allow update: if isVerifiedAgronomist()
+                    && !request.resource.data.diff(resource.data)
+                          .affectedKeys()
+                          .hasAny(['uid', 'species', 'disease', 'confidence',
+                                   'modelVersion', 'createdAt']);
+
+      allow delete: if isSelf(resource.data.uid) || isAdmin();
+    }
+
+    // ----------------------------------------------------- district_stats
+
+    match /district_stats/{district} {
+      // Public hotspot data - aggregated to district level by construction.
+      allow read: if isSignedIn();
+
+      // See the design note at the top: client-maintained on the free tier.
+      allow write: if isSignedIn();
+    }
+
+    // ----------------------------------------------------- model_feedback
+
+    // ------------------------------------------------------ interventions
+
+    match /interventions/{id} {
+      // Any signed-in user can see whether the department has responded to an
+      // outbreak in their district - that transparency is the point.
+      allow read: if isSignedIn();
+
+      // Only officers set response status. A farmer marking their own
+      // district "resolved" would corrupt the department's worklist.
+      allow write: if isOfficer();
+    }
+
+    // ----------------------------------------------------- model_releases
+
+    match /model_releases/{version} {
+      // Every device needs to discover updates.
+      allow read: if isSignedIn();
+
+      // Published by the retraining operator through the Admin SDK, which
+      // bypasses these rules. No client may forge a release - that would let
+      // an attacker push arbitrary weights to every phone.
+      allow write: if false;
+    }
+
+    match /model_feedback/{sampleId} {
+      // Training samples. Only reviewers generate them and only officers,
+      // admins and the originating farmer can read them back.
+      allow read: if isOfficer()
+                  || isVerifiedAgronomist()
+                  || (isSignedIn() && resource.data.farmerUid == request.auth.uid);
+
+      allow create: if isVerifiedAgronomist();
+
+      // Immutable once written. A training sample that can be edited after
+      // the fact is not ground truth.
+      allow update, delete: if isAdmin();
+    }
+  }
+}
