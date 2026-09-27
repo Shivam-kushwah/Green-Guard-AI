@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -71,13 +73,23 @@ class FirestoreService {
       return fresh;
     }
 
-    await ref.update({
+    // Fire-and-forget: the farmer doesn't need to wait on this write to sign
+    // in. A stale display name for a moment is harmless; a login that blocks
+    // on a second round trip every single time is not - this used to await
+    // a write AND then a second read of the same document just to hand back
+    // data this call already had from `snap`.
+    unawaited(ref.update({
       'name': name,
       'email': email,
       'photoUrl': photoUrl,
       'lastActiveAt': Timestamp.now(),
-    });
-    return AppUser.fromDoc(await ref.get());
+    }));
+    return AppUser.fromDoc(snap).copyWith(
+      name: name,
+      email: email,
+      photoUrl: photoUrl,
+      lastActiveAt: DateTime.now(),
+    );
   }
 
   Future<AppUser?> getUser(String uid) async {
@@ -94,6 +106,14 @@ class FirestoreService {
 
   Future<void> updateUserFields(String uid, Map<String, dynamic> fields) =>
       users.doc(uid).update(fields);
+
+  /// Every user profile in the system.
+  ///
+  /// Admin-only in practice: `firestore.rules` lets any signed-in user read a
+  /// profile (farmers need to see which agronomist answered them), but only
+  /// the admin screen ever fetches the whole collection at once.
+  Stream<List<AppUser>> watchAllUsers() =>
+      users.snapshots().map((q) => q.docs.map(AppUser.fromDoc).toList());
 
   // ---------------------------------------------------------------- scans
 

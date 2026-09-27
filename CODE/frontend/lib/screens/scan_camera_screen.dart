@@ -5,9 +5,8 @@ import 'dart:ui';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:frontend/l10n/gen/app_localizations.dart';
 import 'package:frontend/model/detection_result.dart';
-import 'package:frontend/model/diagnosis_history_model.dart';
-import 'package:frontend/services/history_service.dart';
 import 'package:frontend/services/tf_service.dart';
 import 'package:frontend/services/scan_reporting_service.dart';
 import 'package:image_picker/image_picker.dart';
@@ -90,7 +89,7 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
         isLoading = false;
       });
 
-      print("Prediction Error: $e");
+      debugPrint("Prediction Error: $e");
     }
   }
 
@@ -142,6 +141,7 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
     if (controller == null || !controller!.value.isInitialized) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       body: Stack(
@@ -174,14 +174,14 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
                       const SizedBox(width: 12),
 
                       /// Title
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
 
                           children: [
                             Text(
-                              "Green Guard Plant Scan",
-                              style: TextStyle(
+                              l10n.scanTitle,
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -189,8 +189,8 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
                             ),
 
                             Text(
-                              "PRECISION SCAN",
-                              style: TextStyle(
+                              l10n.scanSubtitle,
+                              style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 11,
                               ),
@@ -288,9 +288,9 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
                           GestureDetector(
                             onTap: () => Navigator.pop(context),
 
-                            child: const Text(
-                              "CANCEL SCAN",
-                              style: TextStyle(
+                            child: Text(
+                              l10n.scanCancel,
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w500,
                               ),

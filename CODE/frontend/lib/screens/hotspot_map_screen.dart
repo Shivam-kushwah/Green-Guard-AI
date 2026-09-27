@@ -34,6 +34,14 @@ class _HotspotMapScreenState extends State<HotspotMapScreen> {
   String? _speciesFilter;
   DistrictStat? _selected;
 
+  // Cached rather than called inline in build()'s StreamBuilder.stream:
+  // picking a species filter or tapping a district marker both call
+  // setState, which was recreating this and resubscribing the whole
+  // districts listener each time - filtering happens client-side below, so
+  // this stream never actually needs to change.
+  late final Stream<List<DistrictStat>> _districtsStream =
+      HotspotService.instance.watchDistricts();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,7 +62,7 @@ class _HotspotMapScreenState extends State<HotspotMapScreen> {
         ],
       ),
       body: StreamBuilder<List<DistrictStat>>(
-        stream: HotspotService.instance.watchDistricts(),
+        stream: _districtsStream,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());

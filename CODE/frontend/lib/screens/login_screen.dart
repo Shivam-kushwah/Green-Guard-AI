@@ -33,7 +33,10 @@
 // }
 
 import 'package:flutter/material.dart';
-import 'package:frontend/screens/main_screen.dart';
+import 'package:frontend/l10n/gen/app_localizations.dart';
+import 'package:frontend/model/app_user.dart';
+import 'package:frontend/screens/app_gate.dart';
+import 'package:frontend/screens/role_request_screen.dart';
 import 'package:frontend/services/google_auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -72,12 +75,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       const Spacer(),
 
                       // 🌿 Logo Section
-                      _buildLogo(),
+                      _buildLogo(context),
 
                       const SizedBox(height: 30),
 
                       // 📝 Welcome Text
-                      _buildTitle(),
+                      _buildTitle(context),
 
                       const SizedBox(height: 40),
 
@@ -94,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // 🌿 LOGO SECTION
-  Widget _buildLogo() {
+  Widget _buildLogo(BuildContext context) {
     return Column(
       children: [
         // Rounded Logo Box
@@ -120,9 +123,9 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
 
-        const Text(
-          "BOTANICAL INTELLIGENCE",
-          style: TextStyle(
+        Text(
+          AppLocalizations.of(context)!.loginTagline,
+          style: const TextStyle(
             fontSize: 11,
             letterSpacing: 2,
             color: Colors.green,
@@ -134,27 +137,28 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // 📝 TITLE SECTION
-  Widget _buildTitle() {
+  Widget _buildTitle(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
-      children: const [
+      children: [
         Text(
-          "Welcome to Green Guard",
+          l10n.loginWelcome,
           textAlign: TextAlign.center,
 
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
             color: Color(0xFF1F2A1F),
           ),
         ),
 
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
 
         Text(
-          "Your partner in plant health and\nbotanical intelligence.",
+          l10n.loginSubtitle,
           textAlign: TextAlign.center,
 
-          style: TextStyle(fontSize: 15, color: Colors.black54, height: 1.4),
+          style: const TextStyle(fontSize: 15, color: Colors.black54, height: 1.4),
         ),
       ],
     );
@@ -187,11 +191,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 isLogging = true;
               });
 
-              final user = await _auth.signInWithGoogle();
+              final result = await _auth.signInWithGoogle();
 
-              if (user != null) {
-                print(user.email);
-
+              if (result != null) {
                 setState(() {
                   isLogging = false;
                 });
@@ -199,12 +201,28 @@ class _LoginScreenState extends State<LoginScreen> {
                 if (!context.mounted) {
                   return;
                 }
+                // Whether this is a brand-new sign-up or a returning user is
+                // decided by onboardingComplete on the profile signInWithGoogle
+                // already fetched/created - no extra Firestore round trip
+                // needed here just to make this routing decision. An account
+                // that already has a real, non-farmer role (set up by hand in
+                // the console before this screen existed, or already
+                // approved) or an already-pending request must never be sent
+                // back through the picker just because that one flag was
+                // never set on it.
+                final p = result.profile;
+                final skipPicker = p.onboardingComplete ||
+                    p.role != UserRole.farmer ||
+                    p.hasPendingRoleRequest;
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const MainScreen()),
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        skipPicker ? const AppGate() : RoleRequestScreen(user: p),
+                  ),
                 );
               } else {
-                print("Login Failed");
+                debugPrint("Login Failed");
 
                 setState(() {
                   isLogging = false;
@@ -212,8 +230,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text("Error While logging. Try again later !"),
-                    duration: Duration(seconds: 2),
+                    content: Text(AppLocalizations.of(context)!.loginErrorRetry),
+                    duration: const Duration(seconds: 2),
                   ),
                 );
               }
@@ -241,10 +259,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(width: 12),
 
-                  const Text(
-                    "Continue with Google",
+                  Text(
+                    AppLocalizations.of(context)!.loginContinueGoogle,
 
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.black87,
@@ -258,18 +276,18 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 18),
 
           // 🔒 Footer Text
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.center,
 
             children: [
-              Icon(Icons.circle, size: 6, color: Colors.green),
+              const Icon(Icons.circle, size: 6, color: Colors.green),
 
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
 
               Text(
-                "ENCRYPTED SECURE ACCESS",
+                AppLocalizations.of(context)!.loginSecureAccess,
 
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12,
                   letterSpacing: 1,
                   color: Colors.black54,

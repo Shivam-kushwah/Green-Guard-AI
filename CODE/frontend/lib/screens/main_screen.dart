@@ -2,7 +2,9 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:frontend/screens/scan_camera_screen.dart';
+import 'package:provider/provider.dart';
 
+import '../l10n/gen/app_localizations.dart';
 import '../utils/colors.dart';
 import '../services/session.dart';
 import 'expert_queue_screen.dart';
@@ -41,35 +43,13 @@ class _MainScreenState extends State<MainScreen> {
   /// made the previous index handling hard to follow.
   int _selectedTab = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    // The role can change under the user when an admin verifies them, so the
-    // nav has to rebuild rather than being fixed at first build.
-    Session.instance.addListener(_onSessionChanged);
-  }
-
-  @override
-  void dispose() {
-    Session.instance.removeListener(_onSessionChanged);
-    super.dispose();
-  }
-
-  void _onSessionChanged() {
-    if (!mounted) return;
-    setState(() {
-      // Drop back to Home if the current tab no longer exists for this role.
-      if (_selectedTab >= _tabs.length) _selectedTab = 0;
-    });
-  }
-
   /// Verified agronomists get the review queue where a farmer gets My Cases.
   /// Same binary, same slot - only the destination differs.
-  bool get _isReviewer => Session.instance.canReview;
+  bool _isReviewer = false;
 
   /// Officers get the surveillance dashboard in the slot a farmer uses for
   /// their own cases - the roles never need both at once.
-  bool get _isOfficer => Session.instance.canViewDashboard;
+  bool _isOfficer = false;
 
   List<Widget> get _tabs => [
     const HomeScreen(),
@@ -96,12 +76,25 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // The role can change under the user when an admin verifies them -
+    // watching Session here rebuilds the nav the moment that happens, with
+    // no manual addListener/dispose bookkeeping.
+    final session = context.watch<Session>();
+    _isReviewer = session.canReview;
+    _isOfficer = session.canViewDashboard;
+
+    // Drop back to Home if the current tab no longer exists for this role
+    // (e.g. an officer demotion). _tabs is recomputed fresh above, so this
+    // just clamps the stored index to match.
+    final tabs = _tabs;
+    if (_selectedTab >= tabs.length) _selectedTab = 0;
+
     return Scaffold(
       extendBody: true,
 
       // IndexedStack keeps each tab alive, so returning to the map does not
       // refetch Firestore and re-centre the camera every time.
-      body: IndexedStack(index: _selectedTab, children: _tabs),
+      body: IndexedStack(index: _selectedTab, children: tabs),
 
       bottomNavigationBar: _BottomNavBar(
         selectedTab: _selectedTab,
@@ -116,28 +109,41 @@ class _MainScreenState extends State<MainScreen> {
 /// What the bar can do. Naming these avoids the magic-number remapping the
 /// old switch relied on.
 enum _NavDestination {
-  home(0, Icons.home_rounded, 'Home'),
-  map(1, Icons.public_rounded, 'Map'),
-  scan(-1, Icons.camera_alt_outlined, 'Scan'),
-  cases(2, Icons.support_agent_rounded, 'Cases'),
-  profile(3, Icons.person_outline_rounded, 'Profile');
+  home(0, Icons.home_rounded),
+  map(1, Icons.public_rounded),
+  scan(-1, Icons.camera_alt_outlined),
+  cases(2, Icons.support_agent_rounded),
+  profile(3, Icons.person_outline_rounded);
 
-  const _NavDestination(this.tabIndex, this.icon, this.label);
+  const _NavDestination(this.tabIndex, this.icon);
 
   /// -1 for destinations that push a route instead of switching tab.
   final int tabIndex;
   final IconData icon;
-  final String label;
 
   bool get isTab => tabIndex >= 0;
 
   /// The third slot changes meaning with the role: farmers see their own
   /// cases, agronomists a review queue, officers the state dashboard.
-  String labelFor({required bool isReviewer, required bool isOfficer}) {
-    if (this != _NavDestination.cases) return label;
-    if (isOfficer) return 'Dashboard';
-    if (isReviewer) return 'Review';
-    return label;
+  String labelFor(
+    AppLocalizations l10n, {
+    required bool isReviewer,
+    required bool isOfficer,
+  }) {
+    switch (this) {
+      case _NavDestination.home:
+        return l10n.navHome;
+      case _NavDestination.map:
+        return l10n.navMap;
+      case _NavDestination.scan:
+        return l10n.navScan;
+      case _NavDestination.profile:
+        return l10n.navProfile;
+      case _NavDestination.cases:
+        if (isOfficer) return l10n.navDashboard;
+        if (isReviewer) return l10n.navReview;
+        return l10n.navCases;
+    }
   }
 
   IconData iconFor({required bool isReviewer, required bool isOfficer}) {
@@ -163,6 +169,7 @@ class _BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -189,6 +196,7 @@ class _BottomNavBar extends StatelessWidget {
                       isOfficer: isOfficer,
                     ),
                     label: dest.labelFor(
+                      l10n,
                       isReviewer: isReviewer,
                       isOfficer: isOfficer,
                     ),

@@ -91,37 +91,25 @@ class TfService {
     }
 
     final bytes = await imageFile.readAsBytes();
-    final decoded = img.decodeImage(bytes);
-    if (decoded == null) {
-      throw Exception('Could not decode image');
-    }
 
-    final resized = img.copyResize(
-      decoded,
-      width: _inputSize,
-      height: _inputSize,
-    );
-
-    final input = List.generate(
-      1,
-      (_) => List.generate(
-        _inputSize,
-        (y) => List.generate(_inputSize, (x) {
-          final pixel = resized.getPixel(x, y);
-          return [pixel.r / 255.0, pixel.g / 255.0, pixel.b / 255.0];
-        }),
+    // Decode, resize, tensor build and the native invoke all run on a
+    // background isolate - this used to run inline on the UI isolate and was
+    // the single biggest source of dropped frames in the app, on every scan.
+    // Interpreter.address/.fromAddress is tflite_flutter's documented pattern
+    // for handing the SAME native interpreter to another isolate (not a
+    // second model instance) - see its interpreter.dart doc comment.
+    final probs = await compute(
+      _runInference,
+      _InferenceRequest(
+        bytes: bytes,
+        inputSize: _inputSize,
+        interpreterAddress: _interpreter!.address,
+        // Size the output buffer from the label map rather than a literal
+        // 16. The hardcoded value was a latent break the moment the model
+        // is retrained with additional classes.
+        classCount: _labels.length,
       ),
     );
-
-    // Size the output buffer from the label map rather than a literal 16.
-    // The hardcoded value was a latent break the moment the model is
-    // retrained with additional classes.
-    final classCount = _labels.length;
-    final output = List.filled(classCount, 0.0).reshape([1, classCount]);
-
-    _interpreter!.run(input, output);
-
-    final probs = List<double>.from(output[0] as List);
 
     var index = 0;
     for (var i = 1; i < probs.length; i++) {
@@ -166,6 +154,55 @@ class TfService {
     _interpreter?.close();
     _interpreter = null;
   }
+}
+
+/// Everything [_runInference] needs, bundled into one isolate-sendable
+/// value - compute() takes exactly one argument.
+class _InferenceRequest {
+  final Uint8List bytes;
+  final int inputSize;
+  final int interpreterAddress;
+  final int classCount;
+
+  const _InferenceRequest({
+    required this.bytes,
+    required this.inputSize,
+    required this.interpreterAddress,
+    required this.classCount,
+  });
+}
+
+/// Top-level so it can run via [compute] - the expensive part of every scan.
+List<double> _runInference(_InferenceRequest req) {
+  final decoded = img.decodeImage(req.bytes);
+  if (decoded == null) {
+    throw Exception('Could not decode image');
+  }
+
+  final resized = img.copyResize(
+    decoded,
+    width: req.inputSize,
+    height: req.inputSize,
+  );
+
+  final input = List.generate(
+    1,
+    (_) => List.generate(
+      req.inputSize,
+      (y) => List.generate(req.inputSize, (x) {
+        final pixel = resized.getPixel(x, y);
+        return [pixel.r / 255.0, pixel.g / 255.0, pixel.b / 255.0];
+      }),
+    ),
+  );
+
+  final output =
+      List.filled(req.classCount, 0.0).reshape([1, req.classCount]);
+
+  final interpreter = Interpreter.fromAddress(req.interpreterAddress);
+  interpreter.run(input, output);
+
+  return List<double>.from(output[0] as List);
 }
 
 /// Top-level so it can run via [compute].

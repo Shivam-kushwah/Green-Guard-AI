@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../model/app_user.dart';
@@ -39,6 +40,20 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
 
   int _trendDays = 30;
 
+  // Cached rather than called inline in build()'s StreamBuilder.stream: this
+  // screen calls setState for plenty of unrelated reasons (the trend-days
+  // picker, async panel loads) - recomputing these on every one of those
+  // rebuilds tore down and resubscribed both Firestore listeners each time,
+  // which is wasted reads and visible flicker. _districtsStream is
+  // deliberately reassigned (not late-final) because it genuinely needs a
+  // fresh query when _includeDemo actually toggles; _interventionsStream
+  // never depends on anything that changes, so it is cached forever.
+  late Stream<List<DistrictStat>> _districtsStream = _hotspots.watchDistricts(
+    includeDemo: _includeDemo,
+  );
+  late final Stream<List<Intervention>> _interventionsStream =
+      _dash.watchInterventions();
+
   @override
   void initState() {
     super.initState();
@@ -73,14 +88,40 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         surfaceTintColor: Colors.transparent,
-        title: const Text(
-          'State Surveillance',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+        elevation: 0,
+        titleSpacing: 20,
+        title: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.insights_rounded,
+                size: 18,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'State Surveillance',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 17,
+                letterSpacing: -0.3,
+                color: AppColors.onSurface,
+              ),
+            ),
+          ],
         ),
         actions: [
           IconButton(
             tooltip: 'Open outbreak map',
             icon: const Icon(Icons.map_outlined),
+            color: AppColors.primary,
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const HotspotMapScreen()),
@@ -89,12 +130,14 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
           IconButton(
             tooltip: 'Refresh',
             icon: const Icon(Icons.refresh_rounded),
+            color: AppColors.primary,
             onPressed: _loadAsyncPanels,
           ),
+          const SizedBox(width: 6),
         ],
       ),
       body: StreamBuilder<List<DistrictStat>>(
-        stream: _hotspots.watchDistricts(includeDemo: _includeDemo),
+        stream: _districtsStream,
         builder: (context, statSnap) {
           if (statSnap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -104,7 +147,7 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
           final summary = _hotspots.summarise(stats);
 
           return StreamBuilder<List<Intervention>>(
-            stream: _dash.watchInterventions(),
+            stream: _interventionsStream,
             builder: (context, intSnap) {
               final clusters = _dash.buildClusters(
                 stats,
@@ -118,7 +161,12 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
                     // Two columns on a browser window, one on a phone.
                     final wide = constraints.maxWidth >= 900;
                     return ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+                      // This screen renders both as a mobile tab (behind a
+                      // frosted bottom nav bar ~75px tall, via extendBody)
+                      // and as the standalone web dashboard (no nav bar at
+                      // all) - only the mobile case needs the extra
+                      // clearance, or the last panel renders under the bar.
+                      padding: EdgeInsets.fromLTRB(16, 12, 16, kIsWeb ? 40 : 110),
                       children: [
                         if (stats.any((s) => s.isDemo)) _demoBanner(),
                         _kpiRow(summary, constraints.maxWidth),
@@ -157,6 +205,8 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
       _diseasePanel(summary),
       const SizedBox(height: 20),
       _cropPanel(stats),
+      const SizedBox(height: 20),
+      _districtPanel(stats),
     ],
   );
 
@@ -212,7 +262,7 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: 11,
       crossAxisSpacing: 11,
-      childAspectRatio: 1.45,
+      childAspectRatio: 1.3,
       children: tiles,
     );
   }
@@ -317,6 +367,39 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
                 // Magnitude comparison, so one hue - length carries the
                 // ranking and colour adds nothing by varying.
                 color: AppColors.primary,
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
+  Widget _districtPanel(List<DistrictStat> stats) {
+    final ranked = stats.where((s) => s.diseaseCases > 0).toList()
+      ..sort((a, b) => b.hotspotScore.compareTo(a.hotspotScore));
+    if (ranked.isEmpty) {
+      return _panel(
+        title: 'District ranking',
+        child: _empty('No district reports yet'),
+      );
+    }
+    final maxScore = ranked.first.hotspotScore.round();
+
+    return _panel(
+      title: 'District ranking',
+      subtitle: 'By outbreak severity, worst first',
+      child: Column(
+        children: ranked
+            .take(8)
+            .map(
+              (s) => RankedBar(
+                label: s.district,
+                sublabel:
+                    '${s.diseaseCases} case${s.diseaseCases == 1 ? '' : 's'}',
+                value: s.hotspotScore.round(),
+                maxValue: maxScore,
+                color: RiskColors.forScore(s.hotspotScore),
+                badge: s.isDemo ? 'DEMO' : null,
               ),
             )
             .toList(),
@@ -668,8 +751,14 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
       color: AppColors.surfaceContainerLowest,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppColors.outlineVariant),
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x0F171D14),
+          blurRadius: 12,
+          offset: Offset(0, 4),
+        ),
+      ],
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -776,7 +865,10 @@ class _OfficerDashboardScreenState extends State<OfficerDashboardScreen> {
           ),
         ),
         TextButton(
-          onPressed: () => setState(() => _includeDemo = !_includeDemo),
+          onPressed: () => setState(() {
+            _includeDemo = !_includeDemo;
+            _districtsStream = _hotspots.watchDistricts(includeDemo: _includeDemo);
+          }),
           child: Text(
             _includeDemo ? 'HIDE' : 'SHOW',
             style: const TextStyle(

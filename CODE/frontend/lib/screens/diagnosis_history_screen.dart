@@ -1,9 +1,11 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../l10n/gen/app_localizations.dart';
 import '../model/diagnosis_history_model.dart';
-import '../services/history_service.dart';
+import '../services/history_provider.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -13,27 +15,19 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  List<DiagnosisHistory> history = [];
-
   String selectedFilter = "All";
-
-  final String username = "shivam";
 
   @override
   void initState() {
     super.initState();
-    loadHistory();
-  }
-
-  Future<void> loadHistory() async {
-    history = await HistoryService.getHistory();
-
-    setState(() {});
+    if (!HistoryProvider.instance.hasLoaded) {
+      HistoryProvider.instance.reload();
+    }
   }
 
   /// FILTER LOGIC
 
-  List<DiagnosisHistory> get filteredHistory {
+  List<DiagnosisHistory> _filtered(List<DiagnosisHistory> history) {
     if (selectedFilter == "Healthy") {
       return history.where((e) => e.result.toLowerCase() == "healthy").toList();
     }
@@ -47,6 +41,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final filteredHistory = _filtered(
+      context.watch<HistoryProvider>().items,
+    );
+
     return Scaffold(
       backgroundColor: const Color(0xFFEFF3EA),
 
@@ -60,17 +59,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
             children: [
               /// TITLE
               Center(
-                child: const Text(
-                  "History",
-                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                child: Text(
+                  l10n.historyTitle,
+                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
                 ),
               ),
 
               const SizedBox(height: 6),
 
-              const Text(
-                "Tracking your botanical journey through scientific analysis.",
-                style: TextStyle(color: Colors.black54),
+              Text(
+                l10n.historySubtitle,
+                style: const TextStyle(color: Colors.black54),
               ),
 
               const SizedBox(height: 16),
@@ -78,13 +77,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
               /// FILTER CHIPS
               Row(
                 children: [
-                  _filterChip("All"),
+                  _filterChip(key: "All", label: l10n.historyFilterAll),
                   const SizedBox(width: 8),
 
-                  _filterChip("Diseased"),
+                  _filterChip(key: "Diseased", label: l10n.historyFilterDiseased),
                   const SizedBox(width: 8),
 
-                  _filterChip("Healthy"),
+                  _filterChip(key: "Healthy", label: l10n.historyFilterHealthy),
                 ],
               ),
 
@@ -93,7 +92,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               /// LIST
               Expanded(
                 child: filteredHistory.isEmpty
-                    ? const Center(child: Text("No History Yet"))
+                    ? Center(child: Text(l10n.historyEmpty))
                     : ListView.builder(
                         itemCount: filteredHistory.length,
 
@@ -113,13 +112,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   /// FILTER CHIP
 
-  Widget _filterChip(String title) {
-    final isSelected = selectedFilter == title;
+  Widget _filterChip({required String key, required String label}) {
+    final isSelected = selectedFilter == key;
 
     return GestureDetector(
       onTap: () {
         setState(() {
-          selectedFilter = title;
+          selectedFilter = key;
         });
       },
 
@@ -133,7 +132,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
 
         child: Text(
-          title,
+          label,
 
           style: TextStyle(
             color: isSelected ? Colors.white : Colors.black,
@@ -177,6 +176,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
               height: 70,
 
               fit: BoxFit.cover,
+              // Caps the decode target instead of the full-resolution
+              // original - real memory/GC pressure otherwise in a scrolling
+              // list where every row repeats this.
+              cacheWidth: 140,
+              cacheHeight: 140,
             ),
           ),
 

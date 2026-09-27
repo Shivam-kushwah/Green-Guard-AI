@@ -8,6 +8,7 @@ import '../model/diagnosis_history_model.dart';
 import '../model/scan_record.dart';
 import '../model/user_model.dart';
 import 'firestore_service.dart';
+import 'history_provider.dart';
 import 'history_service.dart';
 import 'location_service.dart';
 
@@ -70,6 +71,9 @@ class ScanReportingService {
           confidence: r.confidence,
         ),
       );
+      // Reload rather than append: keeps HistoryProvider's ordering/dedup
+      // logic in one place (HistoryService.getHistory) instead of two.
+      await HistoryProvider.instance.reload();
     } catch (e) {
       debugPrint('ScanReportingService: local history failed: $e');
     }

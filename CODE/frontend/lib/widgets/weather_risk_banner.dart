@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data/disease_kb.dart';
@@ -13,6 +15,11 @@ import '../utils/risk_colors.dart';
 /// Deliberately quiet when there is nothing to say: no location, no key, or no
 /// elevated risk all collapse to either a small neutral strip or nothing at
 /// all. A banner that shouts every day stops being read.
+///
+/// When more than one crop has a risk worth showing, this becomes a
+/// horizontally auto-scrolling carousel (still swipeable by hand) rather than
+/// only ever surfacing the single worst one - a farmer growing three crops
+/// should see all three, not just whichever is currently riskiest.
 class WeatherRiskBanner extends StatefulWidget {
   final List<String>? crops;
 
@@ -23,15 +30,29 @@ class WeatherRiskBanner extends StatefulWidget {
 }
 
 class _WeatherRiskBannerState extends State<WeatherRiskBanner> {
-  DiseaseRisk? _top;
+  static const _autoScrollInterval = Duration(seconds: 5);
+  static const _maxCards = 5;
+
+  final _pageController = PageController();
+
+  List<DiseaseRisk> _risks = const [];
   FarmLocation? _loc;
   bool _loading = true;
   bool _failed = false;
+  int _page = 0;
+  Timer? _autoScrollTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _autoScrollTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -53,14 +74,17 @@ class _WeatherRiskBannerState extends State<WeatherRiskBanner> {
                 ? loc.district.majorCrops
                 : DiseaseKb.allSpecies.where((s) => s != 'Generic').toList());
 
+      // Already worst-first (RiskEngine.assessCrops), so the carousel opens
+      // on the most urgent card and only degrades in severity from there.
       final risks = RiskEngine.assessCrops(crops, weather.forecast);
 
       if (!mounted) return;
       setState(() {
         _loc = loc;
-        _top = risks.isEmpty ? null : risks.first;
+        _risks = risks.take(_maxCards).toList();
         _loading = false;
       });
+      _restartAutoScroll();
     } catch (_) {
       _markFailed();
     }
@@ -71,6 +95,21 @@ class _WeatherRiskBannerState extends State<WeatherRiskBanner> {
     setState(() {
       _loading = false;
       _failed = true;
+    });
+  }
+
+  void _restartAutoScroll() {
+    _autoScrollTimer?.cancel();
+    if (_risks.length < 2) return;
+
+    _autoScrollTimer = Timer.periodic(_autoScrollInterval, (_) {
+      if (!mounted || !_pageController.hasClients) return;
+      final next = (_page + 1) % _risks.length;
+      _pageController.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeInOutCubic,
+      );
     });
   }
 
@@ -89,10 +128,52 @@ class _WeatherRiskBannerState extends State<WeatherRiskBanner> {
 
     // Nothing useful to show - stay out of the way rather than occupying
     // prime screen space with an error.
-    if (_failed && _top == null) return const SizedBox.shrink();
-    if (_top == null) return const SizedBox.shrink();
+    if (_risks.isEmpty) return const SizedBox.shrink();
+    if (_failed && _risks.isEmpty) return const SizedBox.shrink();
 
-    final risk = _top!;
+    return Column(
+      children: [
+        SizedBox(
+          height: 72,
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: _risks.length,
+            onPageChanged: (i) {
+              // A manual swipe should not fight the timer - it just resumes
+              // counting from wherever the farmer left it.
+              _page = i;
+            },
+            itemBuilder: (context, i) => _riskCard(_risks[i]),
+          ),
+        ),
+        if (_risks.length > 1) ...[
+          const SizedBox(height: 8),
+          _dots(),
+        ],
+      ],
+    );
+  }
+
+  Widget _dots() => Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: List.generate(_risks.length, (i) {
+      final active = i == _page;
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        width: active ? 18 : 6,
+        height: 6,
+        decoration: BoxDecoration(
+          color: active
+              ? AppColors.primary
+              : AppColors.onSurfaceVariant.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(99),
+        ),
+      );
+    }),
+  );
+
+  Widget _riskCard(DiseaseRisk risk) {
     final color = RiskColors.forBand(risk.band);
     final urgent =
         risk.band == RiskBand.high || risk.band == RiskBand.severe;
@@ -101,6 +182,7 @@ class _WeatherRiskBannerState extends State<WeatherRiskBanner> {
       onTap: _open,
       child: Container(
         width: double.infinity,
+        margin: const EdgeInsets.symmetric(horizontal: 1),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: urgent
@@ -136,7 +218,9 @@ class _WeatherRiskBannerState extends State<WeatherRiskBanner> {
                   Text(
                     urgent
                         ? '${risk.band.label} risk: ${risk.disease.commonName}'
-                        : 'Disease risk is low this week',
+                        : '${risk.disease.commonName}: low risk this week',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w700,

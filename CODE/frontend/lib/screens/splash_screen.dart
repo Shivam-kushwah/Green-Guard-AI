@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:frontend/model/user_model.dart';
+import 'package:frontend/screens/app_gate.dart';
 import 'package:frontend/screens/login_screen.dart';
-import 'package:frontend/screens/main_screen.dart';
 import 'package:hive/hive.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -45,9 +45,14 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // Navigate AFTER delay
     if (user != null) {
+      // AppGate re-checks live whether this account has a pending role
+      // request (not just whatever MainScreen would have assumed), so a
+      // returning user who requested agronomist/officer access and reopens
+      // the app before an admin has acted still lands on the pending screen,
+      // not straight into the app.
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const MainScreen()),
+        MaterialPageRoute(builder: (_) => const AppGate()),
       );
     } else {
       Navigator.pushReplacement(

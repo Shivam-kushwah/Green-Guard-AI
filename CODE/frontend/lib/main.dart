@@ -4,10 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:frontend/screens/splash_screen.dart';
 import 'package:frontend/utils/colors.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:provider/provider.dart';
 
+import 'l10n/gen/app_localizations.dart';
 import 'model/diagnosis_history_model.dart';
 import 'model/user_model.dart';
 import 'services/firestore_service.dart';
+import 'services/history_provider.dart';
+import 'services/locale_controller.dart';
 import 'services/model_update_service.dart';
 import 'services/session.dart';
 import 'services/tf_service.dart';
@@ -35,9 +39,17 @@ void main() async {
     ),
   );
 
+  // Best-known role/pending status from before sign-in resolves, so AppGate
+  // can make an instant first guess on cold start instead of a guaranteed
+  // loading flash while Firestore's stream catches up.
+  await Session.instance.preloadCache();
+
   // Tracks the signed-in user profile so role-gated screens react the moment
   // an admin verifies an agronomist, without needing an app restart.
   Session.instance.start();
+
+  // The farmer's saved language choice (Profile -> Language), if any.
+  await LocaleController.instance.preload();
 
   // Prefer a model downloaded by the learning loop over the one compiled
   // into the APK, so a phone that already updated keeps the newer weights
@@ -49,7 +61,16 @@ void main() async {
     await TfService.instance.loadModel();
   }
 
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: Session.instance),
+        ChangeNotifierProvider.value(value: HistoryProvider.instance),
+        ChangeNotifierProvider.value(value: LocaleController.instance),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {
@@ -61,9 +82,14 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
+    final locale = context.watch<LocaleController>().locale;
+
     return MaterialApp(
       title: 'Green Guard',
       debugShowCheckedModeBanner: false,
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
 
       theme: ThemeData(
         fontFamily: 'Plus Jakarta Sans',

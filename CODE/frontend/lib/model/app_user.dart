@@ -68,6 +68,24 @@ class AppUser {
   final DateTime createdAt;
   final DateTime? lastActiveAt;
 
+  /// True once the farmer has been through the post-signup "what do you use
+  /// Green Guard for" step (RoleRequestScreen) at least once - whether they
+  /// picked Farmer and moved on, or filed a role request. Self-writable: it
+  /// is not in firestore.rules' notEscalatingPrivilege() blocklist, so it
+  /// carries no privilege of its own.
+  final bool onboardingComplete;
+
+  /// A self-filed request to become an agronomist or officer, pending admin
+  /// approval. The role only actually changes once an admin approves it in
+  /// the Manage Users screen (updateUserFields, isAdmin()-gated) - this field
+  /// alone grants nothing, which is why a farmer is allowed to set it on
+  /// themselves.
+  final UserRole? requestedRole;
+  final DateTime? requestedAt;
+  final String? requestedQualification;
+  final String? requestedInstitution;
+  final String? requestedDistrict;
+
   const AppUser({
     required this.uid,
     required this.name,
@@ -83,9 +101,17 @@ class AppUser {
     this.scanCount = 0,
     this.reviewsCompleted = 0,
     this.lastActiveAt,
+    this.onboardingComplete = false,
+    this.requestedRole,
+    this.requestedAt,
+    this.requestedQualification,
+    this.requestedInstitution,
+    this.requestedDistrict,
   });
 
   bool get isFarmer => role == UserRole.farmer;
+
+  bool get hasPendingRoleRequest => requestedRole != null;
 
   /// Only a *verified* agronomist may act on the review queue. The role alone
   /// is not enough - this is enforced again in the Firestore rules.
@@ -111,6 +137,14 @@ class AppUser {
       createdAt:
           (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       lastActiveAt: (d['lastActiveAt'] as Timestamp?)?.toDate(),
+      onboardingComplete: (d['onboardingComplete'] as bool?) ?? false,
+      requestedRole: d['requestedRole'] == null
+          ? null
+          : UserRoleX.fromWire(d['requestedRole'] as String?),
+      requestedAt: (d['requestedAt'] as Timestamp?)?.toDate(),
+      requestedQualification: d['requestedQualification'] as String?,
+      requestedInstitution: d['requestedInstitution'] as String?,
+      requestedDistrict: d['requestedDistrict'] as String?,
     );
   }
 
@@ -131,10 +165,18 @@ class AppUser {
     'lastActiveAt': lastActiveAt == null
         ? null
         : Timestamp.fromDate(lastActiveAt!),
+    'onboardingComplete': onboardingComplete,
+    'requestedRole': requestedRole?.wire,
+    'requestedAt': requestedAt == null ? null : Timestamp.fromDate(requestedAt!),
+    'requestedQualification': requestedQualification,
+    'requestedInstitution': requestedInstitution,
+    'requestedDistrict': requestedDistrict,
   };
 
   AppUser copyWith({
     String? name,
+    String? email,
+    String? photoUrl,
     UserRole? role,
     String? district,
     List<String>? crops,
@@ -144,11 +186,12 @@ class AppUser {
     int? scanCount,
     int? reviewsCompleted,
     DateTime? lastActiveAt,
+    bool? onboardingComplete,
   }) => AppUser(
     uid: uid,
     name: name ?? this.name,
-    email: email,
-    photoUrl: photoUrl,
+    email: email ?? this.email,
+    photoUrl: photoUrl ?? this.photoUrl,
     role: role ?? this.role,
     district: district ?? this.district,
     crops: crops ?? this.crops,
@@ -159,5 +202,16 @@ class AppUser {
     reviewsCompleted: reviewsCompleted ?? this.reviewsCompleted,
     createdAt: createdAt,
     lastActiveAt: lastActiveAt ?? this.lastActiveAt,
+    // Request/onboarding fields are never touched through copyWith's named
+    // params (nothing needs to change them this way) - always carried
+    // through as-is, or they would silently reset to their defaults on every
+    // copyWith call, which is exactly the kind of bug that would make a
+    // farmer's already-submitted role request vanish from under them.
+    onboardingComplete: onboardingComplete ?? this.onboardingComplete,
+    requestedRole: requestedRole,
+    requestedAt: requestedAt,
+    requestedQualification: requestedQualification,
+    requestedInstitution: requestedInstitution,
+    requestedDistrict: requestedDistrict,
   );
 }

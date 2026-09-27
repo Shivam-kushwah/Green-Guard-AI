@@ -476,7 +476,6 @@ class _ReviewCaseScreenState extends State<ReviewCaseScreen> {
         controller: _noteController,
         maxLines: 4,
         maxLength: 600,
-        onChanged: (_) => setState(() {}),
         decoration: InputDecoration(
           hintText: 'What should they do, and by when? Be specific about '
               'dose and timing.',
@@ -496,35 +495,43 @@ class _ReviewCaseScreenState extends State<ReviewCaseScreen> {
     ],
   );
 
-  Widget _submitButton() => SizedBox(
-    width: double.infinity,
-    child: ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
-        disabledBackgroundColor: AppColors.outlineVariant,
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
+  // _canSubmit depends on _noteController.text, which used to be re-checked
+  // via a whole-screen setState() on every keystroke in the advice box -
+  // scoping the rebuild to just this button (as with role_request_screen.dart
+  // before it) means typing advice for a farmer no longer rebuilds the whole
+  // review screen per character.
+  Widget _submitButton() => AnimatedBuilder(
+    animation: _noteController,
+    builder: (context, _) => SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          disabledBackgroundColor: AppColors.outlineVariant,
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
         ),
+        onPressed: (_canSubmit && !_submitting) ? _submit : null,
+        child: _submitting
+            ? const SizedBox(
+                width: 19,
+                height: 19,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Text(
+                'SEND VERDICT',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
       ),
-      onPressed: (_canSubmit && !_submitting) ? _submit : null,
-      child: _submitting
-          ? const SizedBox(
-              width: 19,
-              height: 19,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            )
-          : const Text(
-              'SEND VERDICT',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: 0.5,
-              ),
-            ),
     ),
   );
 

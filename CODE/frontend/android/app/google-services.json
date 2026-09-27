@@ -1,41 +1,41 @@
 {
   "project_info": {
-    "project_number": "742197666221",
-    "project_id": "green-guard-efb41",
-    "storage_bucket": "green-guard-efb41.firebasestorage.app"
+    "project_number": "1008721507598",
+    "project_id": "green-guard-ai-3195e",
+    "storage_bucket": "green-guard-ai-3195e.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:742197666221:android:02b295a50e21fda1d74124",
+        "mobilesdk_app_id": "1:1008721507598:android:04dc70c0ebbc0fc5ee935f",
         "android_client_info": {
           "package_name": "com.shivam.greenguard"
         }
       },
       "oauth_client": [
         {
-          "client_id": "742197666221-ralascrriln59halgvo6765iabattec7.apps.googleusercontent.com",
+          "client_id": "1008721507598-jemh7u2g3fota4qtghvfr57t9bc8dr3q.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.shivam.greenguard",
-            "certificate_hash": "bb86b82faa4f782823eeb521700e0ef57a6b0a36"
+            "certificate_hash": "fc17f627d08f4196dc5e278541be42f05604b0c0"
           }
         },
         {
-          "client_id": "742197666221-klf6r31b2lftr7o5gaqnl7up0bu07lr3.apps.googleusercontent.com",
+          "client_id": "1008721507598-p4ije0lp053mjp9df4tbsr4vs66bjm2g.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyAuzBPFzuJb-_WFzr7u5BO5Ax5UsuKjyaA"
+          "current_key": "AIzaSyDs6lTcgQV17qNbwd3ZbcnEy4v2G6WZHd8"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "742197666221-klf6r31b2lftr7o5gaqnl7up0bu07lr3.apps.googleusercontent.com",
+              "client_id": "1008721507598-p4ije0lp053mjp9df4tbsr4vs66bjm2g.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

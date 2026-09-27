@@ -31,6 +31,11 @@ class DetectionCard extends StatelessWidget {
                   width: 60,
                   height: 60,
                   fit: BoxFit.cover,
+                  // Decoding a multi-megapixel farm photo just to show a
+                  // 60x60 thumbnail was real memory/GC pressure in a list -
+                  // this caps the decode target instead of the full original.
+                  cacheWidth: 120,
+                  cacheHeight: 120,
                 )
               : Container(width: 60, height: 60, color: Colors.grey[200]),
         ),

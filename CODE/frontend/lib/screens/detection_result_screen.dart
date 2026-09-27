@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../data/disease_kb.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../model/detection_result.dart';
 import '../services/scan_reporting_service.dart';
 import '../widgets/ask_expert_sheet.dart';
@@ -26,6 +27,7 @@ class DetectionDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: const Color(0xFFF3F5F1),
       body: SafeArea(
@@ -38,7 +40,7 @@ class DetectionDetailPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _imageCard(),
+                    _imageCard(l10n),
                     const SizedBox(height: 16),
                     _diseaseTitle(),
                     const SizedBox(height: 16),
@@ -46,19 +48,19 @@ class DetectionDetailPage extends StatelessWidget {
                     // Shown first when the model is unsure: the farmer should
                     // read the caveat before the diagnosis, not after.
                     if (result.isLowCertainty) ...[
-                      _uncertaintyCard(),
+                      _uncertaintyCard(l10n),
                       const SizedBox(height: 14),
                     ],
 
-                    _assessmentCard(),
+                    _assessmentCard(l10n),
                     const SizedBox(height: 16),
-                    _symptomsCard(),
+                    _symptomsCard(l10n),
                     const SizedBox(height: 16),
-                    _treatmentCard(),
+                    _treatmentCard(l10n),
 
                     if (info.regionalNote != null) ...[
                       const SizedBox(height: 16),
-                      _regionalCard(),
+                      _regionalCard(l10n),
                     ],
 
                     // Expert review needs a cloud record to attach to, so it
@@ -74,11 +76,11 @@ class DetectionDetailPage extends StatelessWidget {
 
                     if (report != null) ...[
                       const SizedBox(height: 16),
-                      _reportingStatus(),
+                      _reportingStatus(l10n),
                     ],
 
                     const SizedBox(height: 20),
-                    _actionButtons(context),
+                    _actionButtons(context, l10n),
                   ],
                 ),
               ),
@@ -102,7 +104,7 @@ class DetectionDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _imageCard() {
+  Widget _imageCard(AppLocalizations l10n) {
     final threatColor = RiskColors.forThreat(info.threat);
 
     return ClipRRect(
@@ -114,6 +116,10 @@ class DetectionDetailPage extends StatelessWidget {
             height: 200,
             width: double.infinity,
             fit: BoxFit.cover,
+            // Shown large, but a camera photo can still be many times wider
+            // than any phone screen - cap the decode target well above any
+            // realistic display size rather than the raw original.
+            cacheWidth: 900,
             errorBuilder: (_, __, ___) => Container(
               height: 200,
               color: AppColors.surfaceContainer,
@@ -132,7 +138,9 @@ class DetectionDetailPage extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                result.isHealthy ? 'HEALTHY' : '${info.threat.label.toUpperCase()} THREAT',
+                result.isHealthy
+                    ? l10n.resultHealthyBadge
+                    : l10n.resultThreatBadge(info.threat.label.toUpperCase()),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 10,
@@ -180,7 +188,7 @@ class DetectionDetailPage extends StatelessWidget {
   /// dangerous the disease is if it really is present. The old screen drove
   /// both from confidence, which meant a blurry photo of a dying plant read
   /// as "mild" and a sharp photo of a slightly spotted leaf read as "severe".
-  Widget _assessmentCard() {
+  Widget _assessmentCard(AppLocalizations l10n) {
     final threatColor = RiskColors.forThreat(info.threat);
     final certaintyColor = result.isLowCertainty
         ? RiskColors.moderate
@@ -190,9 +198,9 @@ class DetectionDetailPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'ASSESSMENT',
-            style: TextStyle(
+          Text(
+            l10n.resultAssessment,
+            style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w800,
               letterSpacing: 0.8,
@@ -202,11 +210,11 @@ class DetectionDetailPage extends StatelessWidget {
           const SizedBox(height: 14),
 
           _meterRow(
-            label: 'Model certainty',
+            label: l10n.resultModelCertainty,
             value: result.confidence / 100,
             valueText: '${result.confidence.toStringAsFixed(0)}%',
             color: certaintyColor,
-            hint: 'How sure the AI is about this identification',
+            hint: l10n.resultCertaintyHint,
           ),
           const SizedBox(height: 14),
 
@@ -216,9 +224,9 @@ class DetectionDetailPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Threat level',
-                      style: TextStyle(
+                    Text(
+                      l10n.resultThreatLevel,
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -226,8 +234,8 @@ class DetectionDetailPage extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       result.isHealthy
-                          ? 'No disease detected'
-                          : 'How damaging this disease is if present',
+                          ? l10n.resultNoDisease
+                          : l10n.resultThreatHint,
                       style: const TextStyle(
                         fontSize: 11,
                         color: Colors.black45,
@@ -265,16 +273,15 @@ class DetectionDetailPage extends StatelessWidget {
                 color: RiskColors.surfaceFor(RiskColors.severe),
                 borderRadius: BorderRadius.circular(9),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.campaign_outlined,
+                  const Icon(Icons.campaign_outlined,
                       size: 17, color: RiskColors.severe),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Notifiable disease - your district agriculture office '
-                      'should be told about this.',
-                      style: TextStyle(
+                      l10n.resultNotifiable,
+                      style: const TextStyle(
                         fontSize: 11.5,
                         height: 1.4,
                         fontWeight: FontWeight.w600,
@@ -345,7 +352,7 @@ class DetectionDetailPage extends StatelessWidget {
   ///
   /// Spraying the wrong chemical costs a smallholder real money, so an unsure
   /// result has to say so plainly rather than presenting a guess as a finding.
-  Widget _uncertaintyCard() {
+  Widget _uncertaintyCard(AppLocalizations l10n) {
     final runnerUp = result.runnerUp;
 
     return Container(
@@ -366,7 +373,7 @@ class DetectionDetailPage extends StatelessWidget {
                   size: 19, color: RiskColors.moderate),
               const SizedBox(width: 8),
               Text(
-                'The AI is not confident here',
+                l10n.resultLowConfidenceTitle,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
@@ -377,10 +384,7 @@ class DetectionDetailPage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'At ${result.confidence.toStringAsFixed(0)}% certainty this is a '
-            'best guess, not a diagnosis. Retake the photo in daylight with a '
-            'single leaf filling the frame, or send it to an agronomist '
-            'before you spend money on treatment.',
+            l10n.resultLowConfidenceBody(result.confidence.toStringAsFixed(0)),
             style: const TextStyle(fontSize: 12.5, height: 1.5),
           ),
           if (runnerUp != null) ...[
@@ -398,9 +402,11 @@ class DetectionDetailPage extends StatelessWidget {
                   const SizedBox(width: 7),
                   Expanded(
                     child: Text(
-                      'Could also be '
-                      '${DiseaseKb.resolve(runnerUp.species, runnerUp.disease).commonName} '
-                      '(${runnerUp.confidence.toStringAsFixed(0)}%)',
+                      l10n.resultRunnerUp(
+                        DiseaseKb.resolve(runnerUp.species, runnerUp.disease)
+                            .commonName,
+                        runnerUp.confidence.toStringAsFixed(0),
+                      ),
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -416,17 +422,17 @@ class DetectionDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _symptomsCard() => _card(
+  Widget _symptomsCard(AppLocalizations l10n) => _card(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.visibility_outlined, color: Colors.green),
-            SizedBox(width: 8),
+            const Icon(Icons.visibility_outlined, color: Colors.green),
+            const SizedBox(width: 8),
             Text(
-              'Check these signs',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              l10n.resultCheckSigns,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ],
         ),
@@ -439,17 +445,17 @@ class DetectionDetailPage extends StatelessWidget {
     ),
   );
 
-  Widget _treatmentCard() => _card(
+  Widget _treatmentCard(AppLocalizations l10n) => _card(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.health_and_safety, color: Colors.green),
-            SizedBox(width: 8),
+            const Icon(Icons.health_and_safety, color: Colors.green),
+            const SizedBox(width: 8),
             Text(
-              'Treatment and prevention',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              l10n.resultTreatment,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ],
         ),
@@ -461,9 +467,9 @@ class DetectionDetailPage extends StatelessWidget {
         const SizedBox(height: 12),
         const Divider(height: 1),
         const SizedBox(height: 12),
-        const Text(
-          'PREVENT IT NEXT SEASON',
-          style: TextStyle(
+        Text(
+          l10n.resultPreventNextSeason,
+          style: const TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.7,
@@ -479,7 +485,7 @@ class DetectionDetailPage extends StatelessWidget {
     ),
   );
 
-  Widget _regionalCard() => Container(
+  Widget _regionalCard(AppLocalizations l10n) => Container(
     padding: const EdgeInsets.all(15),
     decoration: BoxDecoration(
       color: RiskColors.surfaceFor(AppColors.tertiary),
@@ -488,13 +494,13 @@ class DetectionDetailPage extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.public, size: 17, color: AppColors.tertiary),
-            SizedBox(width: 7),
+            const Icon(Icons.public, size: 17, color: AppColors.tertiary),
+            const SizedBox(width: 7),
             Text(
-              'WHY THIS MATTERS HERE',
-              style: TextStyle(
+              l10n.resultWhyMattersHere,
+              style: const TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.7,
@@ -514,22 +520,19 @@ class DetectionDetailPage extends StatelessWidget {
 
   /// Tells the farmer what happened to their data. Silent data collection is
   /// not acceptable when the thing being collected is where their farm is.
-  Widget _reportingStatus() {
+  Widget _reportingStatus(AppLocalizations l10n) {
     final r = report!;
     final String text;
     final IconData icon;
 
     if (r.cloudId == null) {
-      text = 'Saved on this phone only. Sign in and allow location to add '
-          'your scan to the district outbreak map.';
+      text = l10n.resultSavedLocalOnly;
       icon = Icons.phone_android_rounded;
     } else if (r.excludedFromMap) {
-      text = 'Saved to your history. Your location is outside Maharashtra, so '
-          'it is not added to the state outbreak map.';
+      text = l10n.resultExcludedFromMap;
       icon = Icons.location_off_outlined;
     } else {
-      text = 'Added to the ${r.district} outbreak map. Only your district is '
-          'shared - never your exact field location.';
+      text = l10n.resultAddedToMap(r.district ?? '');
       icon = Icons.cloud_done_outlined;
     }
 
@@ -562,7 +565,7 @@ class DetectionDetailPage extends StatelessWidget {
     child: child,
   );
 
-  Widget _actionButtons(BuildContext context) {
+  Widget _actionButtons(BuildContext context, AppLocalizations l10n) {
     return Column(
       children: [
         SizedBox(
@@ -576,9 +579,9 @@ class DetectionDetailPage extends StatelessWidget {
               ),
             ),
             onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'RE-SCAN',
-              style: TextStyle(
+            child: Text(
+              l10n.resultRescan,
+              style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
@@ -627,6 +630,7 @@ class _ExpertCtaState extends State<_ExpertCta> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (_sent) {
       return Container(
         padding: const EdgeInsets.all(14),
@@ -634,16 +638,15 @@ class _ExpertCtaState extends State<_ExpertCta> {
           color: RiskColors.surfaceFor(RiskColors.healthy),
           borderRadius: BorderRadius.circular(14),
         ),
-        child: const Row(
+        child: Row(
           children: [
-            Icon(Icons.check_circle_outline,
+            const Icon(Icons.check_circle_outline,
                 color: RiskColors.healthy, size: 19),
-            SizedBox(width: 9),
+            const SizedBox(width: 9),
             Expanded(
               child: Text(
-                'Sent to an agronomist. You will see their answer here and in '
-                'My Cases.',
-                style: TextStyle(fontSize: 12.5, height: 1.45),
+                l10n.resultSentToAgronomist,
+                style: const TextStyle(fontSize: 12.5, height: 1.45),
               ),
             ),
           ],
@@ -657,7 +660,7 @@ class _ExpertCtaState extends State<_ExpertCta> {
         child: OutlinedButton.icon(
           onPressed: _ask,
           icon: const Icon(Icons.support_agent_rounded, size: 19),
-          label: const Text('Ask an agronomist'),
+          label: Text(l10n.resultAskAgronomist),
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(
@@ -680,17 +683,15 @@ class _ExpertCtaState extends State<_ExpertCta> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Get this confirmed before you spray',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+          Text(
+            l10n.resultConfirmBeforeSpray,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 5),
           Text(
             widget.result.isLowCertainty
-                ? 'The AI is not confident enough for you to spend money on '
-                      'this diagnosis.'
-                : 'This disease moves fast and treatment is expensive - worth '
-                      'a human check first.',
+                ? l10n.resultLowConfidenceSpend
+                : l10n.resultFastMovingDisease,
             style: const TextStyle(fontSize: 12.5, height: 1.45),
           ),
           const SizedBox(height: 12),
@@ -699,7 +700,7 @@ class _ExpertCtaState extends State<_ExpertCta> {
             child: ElevatedButton.icon(
               onPressed: _ask,
               icon: const Icon(Icons.support_agent_rounded, size: 19),
-              label: const Text('ASK AN AGRONOMIST'),
+              label: Text(l10n.resultAskAgronomistCaps),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
