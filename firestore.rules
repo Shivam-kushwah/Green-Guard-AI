@@ -97,12 +97,17 @@ service cloud.firestore {
 
       // A verified agronomist may rule on a case, but may not rewrite what
       // the model originally said - that would destroy the learning loop's
-      // ground truth.
+      // ground truth. Allow-listed (hasOnly), not deny-listed: a deny-list
+      // here would let a verified agronomist overwrite ANY other field on
+      // someone else's scan (farmerNote, district, imageBase64, even
+      // reviewStatus on an already-resolved case), which is exactly the kind
+      // of gap an allow-list closes by construction.
       allow update: if isVerifiedAgronomist()
-                    && !request.resource.data.diff(resource.data)
+                    && request.resource.data.diff(resource.data)
                           .affectedKeys()
-                          .hasAny(['uid', 'species', 'disease', 'confidence',
-                                   'modelVersion', 'createdAt']);
+                          .hasOnly(['reviewStatus', 'expertUid', 'expertName',
+                                    'expertQualification', 'expertSpecies',
+                                    'expertDisease', 'expertNote', 'reviewedAt']);
 
       allow delete: if isSelf(resource.data.uid) || isAdmin();
     }

@@ -106,3 +106,7 @@ CODE/Model-Training/release.json
 
 # Flutter web build output
 CODE/frontend/build/
+
+# Generated from lib/l10n/app_*.arb by gen-l10n (flutter: generate: true in
+# pubspec.yaml regenerates these automatically on pub get/run/build).
+CODE/frontend/lib/l10n/gen/
