@@ -40,6 +40,10 @@
   "@pendingSubtitleForRole": { "placeholders": { "role": { "type": "String" } } },
   "pendingAutoLetIn": "You will be let in automatically as soon as this is approved - no need to keep checking.",
   "logout": "Log Out",
+  "logoutConfirmTitle": "Log out?",
+  "logoutConfirmMessage": "Are you sure you want to log out?",
+  "commonCancel": "Cancel",
+  "flashUnavailable": "Flash is not available on this camera.",
 
   "homeHeroTitle": "Learn how Green Guard\nhelps farmers",
   "homeHeroExpertTitle": "Get a second opinion\nfrom a verified agronomist",

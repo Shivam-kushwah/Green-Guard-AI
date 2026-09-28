@@ -1,16 +1,20 @@
+import 'secrets.dart';
+
 /// Central configuration for Green Guard AI.
 ///
 /// Secrets are injected at build time, never committed:
 ///   flutter run --dart-define=OWM_API_KEY=xxxxxxxx
+/// or put the key in lib/config/secrets.dart (gitignored) for plain `flutter run`.
 ///
 /// NOTE: a key compiled into an APK is extractable by anyone who unzips it.
 /// That is acceptable for a demo build; before public release the weather
 /// call should move behind a proxy so the key never ships to the device.
 class AppConfig {
-  static const String owmApiKey = String.fromEnvironment(
-    'OWM_API_KEY',
-    defaultValue: '',
-  );
+  static const String _definedOwmKey = String.fromEnvironment('OWM_API_KEY');
+
+  /// --dart-define wins; otherwise the gitignored lib/config/secrets.dart.
+  static const String owmApiKey =
+      _definedOwmKey != '' ? _definedOwmKey : localOwmApiKey;
 
   static bool get hasWeatherKey => owmApiKey.isNotEmpty;
 

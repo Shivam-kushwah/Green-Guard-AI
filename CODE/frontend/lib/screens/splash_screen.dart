@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/model/user_model.dart';
 import 'package:frontend/screens/app_gate.dart';
 import 'package:frontend/screens/login_screen.dart';
+import 'package:frontend/services/app_info.dart';
 import 'package:hive/hive.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -87,9 +88,14 @@ class _SplashScreenState extends State<SplashScreen> {
                     children: [
                       Image.asset('assets/images/logo_full.png'),
 
-                      Text(
-                        'Version 1.0.0',
-                        style: TextStyle(color: Colors.grey),
+                      FutureBuilder<String>(
+                        future: AppInfo.version(),
+                        builder: (context, snap) => Text(
+                          snap.hasData && snap.data!.isNotEmpty
+                              ? 'Version ${snap.data}'
+                              : '',
+                          style: const TextStyle(color: Colors.grey),
+                        ),
                       ),
                     ],
                   ),

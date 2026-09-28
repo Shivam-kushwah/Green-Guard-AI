@@ -26,6 +26,7 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
   List<CameraDescription>? cameras;
 
   int cameraIndex = 0;
+  bool _flashOn = false;
 
   final picker = ImagePicker();
 
@@ -122,8 +123,32 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
     );
   }
 
+  /// Torch on/off. Cameras without a flash (most front cameras) throw on
+  /// setFlashMode, which is how we detect "not available".
+  Future<void> toggleFlash() async {
+    final c = controller;
+    if (c == null || !c.value.isInitialized) return;
+    final want = !_flashOn;
+    try {
+      await c.setFlashMode(want ? FlashMode.torch : FlashMode.off);
+      if (mounted) setState(() => _flashOn = want);
+    } catch (e) {
+      debugPrint('Flash unavailable: $e');
+      if (!mounted) return;
+      setState(() => _flashOn = false);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.flashUnavailable),
+          ),
+        );
+    }
+  }
+
   Future<void> switchCamera() async {
     cameraIndex = (cameraIndex + 1) % cameras!.length;
+    _flashOn = false;
 
     await controller?.dispose();
 
@@ -200,7 +225,10 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
                       ),
 
                       /// Flash
-                      _circleIcon(Icons.flash_on, () {}),
+                      _circleIcon(
+                        _flashOn ? Icons.flash_on : Icons.flash_off,
+                        toggleFlash,
+                      ),
                     ],
                   ),
                 ),

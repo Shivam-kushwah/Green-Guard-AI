@@ -6,6 +6,7 @@ import '../model/app_user.dart';
 import '../model/user_model.dart';
 import '../services/google_auth_service.dart';
 import '../utils/colors.dart';
+import '../widgets/logout_confirm.dart';
 import 'login_screen.dart';
 
 /// Shown instead of the app for a farmer whose agronomist/officer request is
@@ -23,6 +24,8 @@ class PendingApprovalScreen extends StatelessWidget {
   const PendingApprovalScreen({super.key, required this.user});
 
   Future<void> _logout(BuildContext context) async {
+    if (!await confirmLogout(context)) return;
+    if (!context.mounted) return;
     await AuthService().signOut();
     await Hive.box<UserModel>('userBox').delete('currentUser');
     if (!context.mounted) return;

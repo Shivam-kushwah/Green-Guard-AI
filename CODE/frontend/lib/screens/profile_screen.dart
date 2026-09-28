@@ -5,6 +5,8 @@ import '../l10n/gen/app_localizations.dart';
 import '../model/app_user.dart';
 import '../services/locale_controller.dart';
 import '../services/session.dart';
+import '../services/app_info.dart';
+import '../widgets/logout_confirm.dart';
 import '../widgets/model_status_card.dart';
 import 'package:frontend/screens/login_screen.dart';
 import 'package:hive/hive.dart';
@@ -198,6 +200,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: TextButton.icon(
                   onPressed: () async {
+                    if (!await confirmLogout(context)) return;
                     await _auth.signOut();
 
                     userBox.delete("currentUser");
@@ -222,9 +225,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               /// Version Text
               Center(
-                child: Text(
-                  l10n.profileVersion('1.0.0'),
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                child: FutureBuilder<String>(
+                  future: AppInfo.version(),
+                  builder: (context, snap) => Text(
+                    l10n.profileVersion(snap.data ?? ''),
+                    style:
+                        TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
                 ),
               ),
 
